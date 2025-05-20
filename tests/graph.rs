@@ -3,6 +3,7 @@ extern crate petgraph;
 use core::hash::Hash;
 use std::collections::HashSet;
 
+use petgraph::csr::DefaultIx;
 use petgraph::prelude::*;
 use petgraph::EdgeType;
 
@@ -1594,6 +1595,39 @@ fn test_has_path() {
     assert!(has_path_connecting(&gr, a, c, None));
     assert!(has_path_connecting(&gr, a, c, Some(&mut state)));
     assert!(!has_path_connecting(&gr, h, a, Some(&mut state)));
+}
+
+#[test]
+fn map_try_map() {
+    let mut g = Graph::new_undirected();
+    let a = g.add_node("A");
+    let b = g.add_node("B");
+    g.add_edge(a, b, 1);
+
+    assert!(g.try_map(|_, _| Ok(()), |_, _| Ok::<(), ()>(())).is_ok());
+
+    assert!(g
+        .try_map(|_, _| Ok(()), |_, _| Err::<(), &str>("bang!"))
+        .is_err());
+}
+
+#[test]
+fn map_try_map_owned() {
+    fn graph() -> Graph<&'static str, u32, Undirected, DefaultIx> {
+        let mut g = Graph::new_undirected();
+        let a = g.add_node("A");
+        let b = g.add_node("B");
+        g.add_edge(a, b, 1);
+        g
+    }
+
+    assert!(graph()
+        .try_map_owned(|_, _| Ok(()), |_, _| Ok::<(), ()>(()))
+        .is_ok());
+
+    assert!(graph()
+        .try_map_owned(|_, _| Ok(()), |_, _| Err::<(), &str>("bang!"))
+        .is_err());
 }
 
 #[test]

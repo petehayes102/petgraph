@@ -1493,6 +1493,69 @@ where
         g
     }
 
+    /// Attempt to create a new `Graph` by mapping node and edge weights to new
+    /// values.
+    ///
+    /// If either of the mapping operations fail, the original graph will remain
+    /// intact, allowing users to recover gracefully from errors.
+    pub fn try_map<'a, F, G, N2, E2, Err>(
+        &'a self,
+        mut node_map: F,
+        mut edge_map: G,
+    ) -> Result<Graph<N2, E2, Ty, Ix>, Err>
+    where
+        F: FnMut(NodeIndex<Ix>, &'a N) -> Result<N2, Err>,
+        G: FnMut(EdgeIndex<Ix>, &'a E) -> Result<E2, Err>,
+    {
+        let mut g = Graph::with_capacity(self.node_count(), self.edge_count());
+        for (i, node) in enumerate(&self.nodes) {
+            match node_map(NodeIndex::new(i), &node.weight) {
+                Ok(nw) => g.add_node(nw),
+                Err(e) => return Err(e),
+            };
+        }
+        for (i, edge) in enumerate(&self.edges) {
+            match edge_map(EdgeIndex::new(i), &edge.weight) {
+                Ok(ew) => g.add_edge(edge.source(), edge.target(), ew),
+                Err(e) => return Err(e),
+            };
+        }
+        Ok(g)
+    }
+
+    /// Attempt to create a new `Graph` by mapping node and edge weights to new
+    /// values.
+    ///
+    /// **Please note:** If either of the mapping operations fail, the original
+    /// graph is destroyed, resulting in total data loss. If this is not desired
+    /// behaviour, see `try_map`.
+    pub fn try_map_owned<F, G, N2, E2, Err>(
+        self,
+        mut node_map: F,
+        mut edge_map: G,
+    ) -> Result<Graph<N2, E2, Ty, Ix>, Err>
+    where
+        F: FnMut(NodeIndex<Ix>, N) -> Result<N2, Err>,
+        G: FnMut(EdgeIndex<Ix>, E) -> Result<E2, Err>,
+    {
+        let mut g = Graph::with_capacity(self.node_count(), self.edge_count());
+        for (i, node) in enumerate(self.nodes) {
+            match node_map(NodeIndex::new(i), node.weight) {
+                Ok(nw) => g.add_node(nw),
+                Err(e) => return Err(e),
+            };
+        }
+        for (i, edge) in enumerate(self.edges) {
+            let source = edge.source();
+            let target = edge.target();
+            match edge_map(EdgeIndex::new(i), edge.weight) {
+                Ok(ew) => g.add_edge(source, target, ew),
+                Err(e) => return Err(e),
+            };
+        }
+        Ok(g)
+    }
+
     /// Create a new `Graph` by mapping nodes and edges.
     /// A node or edge may be mapped to `None` to exclude it from
     /// the resulting graph.
